@@ -81,34 +81,14 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
 
   const alias = PROVIDER_ID_TO_ALIAS[provider] || provider;
   const modelTargetFormat = getModelTargetFormat(alias, model);
-  // Multi-endpoint providers: pick transport matching sourceFormat → zero translation.
-  // Per-model guard: only use the transport when the model declares support for that
-  // sourceFormat — opencode-go models differ in endpoint support (kimi/glm only do
-  // /chat/completions), so without this guard a claude-format request would wrongly
-  // route kimi to /messages.
+  // Multi-endpoint providers: prefer a source-matching transport when supported;
+  // otherwise use the model's target-format transport (including its URL).
   const modelSupportedFormats = getModelSupportedFormats(alias, model);
-  const runtimeTransport = resolveTransport(provider, sourceFormat);
-  // Per-model guard: when a model declares supportedFormats, only use the
-  // sourceFormat-matched transport if that format is declared (opencode-go models
-  // differ — kimi/glm only do /chat/completions). Undeclared models keep the
-  // upstream default (use the transport), preserving behavior for glm/deepseek/...
-  // When the client's wire format is NOT among the model's supportedFormats, fall
-  // back to the transport for the model's declared targetFormat so the URL always
-  // matches the translated body. Without this, a Responses-only model (e.g. Muse
-  // Spark: supportedFormats ["openai-responses"]) requested by an OpenAI client is
-  // translated to the Responses body (`input`) yet POSTed to the default Chat
-  // Completions URL, and upstream rejects it: "unknown parameter `input`".
-  const modelTargetTransport = modelTargetFormat ? resolveTransport(provider, modelTargetFormat) : null;
-  const useTransport = (!modelSupportedFormats || modelSupportedFormats.includes(sourceFormat))
-    ? runtimeTransport
-    : modelTargetTransport;
-  // A source-format-matched endpoint keeps the request lossless. Prefer it
-  // over a model-level targetFormat, which is only the fallback for clients
-  // whose wire format has no supported transport (for example MiniMax-M3:
-  // OpenAI clients should stay on /chat/completions; other clients can fall
-  // back to its declared Claude target).
-  const targetFormat = useTransport?.format || modelTargetFormat || getTargetFormat(provider, credentials);
-  if (useTransport && credentials) credentials.runtimeTransport = useTransport;
+  const runtimeTransport = resolveTransport(provider, sourceFormat, modelTargetFormat, modelSupportedFormats);
+  // A source-format-matched endpoint keeps the request lossless when the model
+  // supports it; otherwise translate to its declared target format.
+  const targetFormat = runtimeTransport?.format || modelTargetFormat || getTargetFormat(provider, credentials);
+  if (runtimeTransport && credentials) credentials.runtimeTransport = runtimeTransport;
   const stripList = getModelStrip(alias, model);
   const upstreamModel = getModelUpstreamId(alias, model);
 
