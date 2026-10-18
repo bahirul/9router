@@ -17,6 +17,8 @@ import { describe, expect, it } from "vitest";
 import { getModelTargetFormat, getModelSupportedFormats, getModelUpstreamId, PROVIDER_ID_TO_ALIAS } from "../../open-sse/config/providerModels.js";
 import { resolveTransport } from "../../open-sse/services/provider.js";
 import { applyThinking } from "../../open-sse/translator/concerns/thinkingUnified.js";
+import { getExecutor } from "../../open-sse/executors/index.js";
+import { MuseExecutor } from "../../open-sse/executors/muse.js";
 import { FORMATS } from "../../open-sse/translator/formats.js";
 
 // Mirrors the transport selection in open-sse/handlers/chatCore.js so the
@@ -53,6 +55,34 @@ describe("Muse Responses wire routing", () => {
     const { targetFormat, useTransport } = selectTransport("muse", "muse-spark-1.3-contributor(xhigh)", FORMATS.OPENAI_RESPONSES);
     expect(targetFormat).toBe(FORMATS.OPENAI_RESPONSES);
     expect(useTransport?.baseUrl).toBe("https://api.meta.ai/v1/responses");
+  });
+});
+
+describe("Muse executor routing", () => {
+  it("is wired for the muse provider", () => {
+    expect(getExecutor("muse")).toBeInstanceOf(MuseExecutor);
+  });
+
+  it("routes Responses-only models to /responses even with a stale chat runtimeTransport", () => {
+    const ex = new MuseExecutor();
+    expect(ex.buildUrl("muse-spark-1.3")).toBe("https://api.meta.ai/v1/responses");
+    expect(ex.buildUrl("muse-spark-1.3-contributor(xhigh)", true, 0, {
+      runtimeTransport: { baseUrl: "https://api.meta.ai/v1/chat/completions" },
+    })).toBe("https://api.meta.ai/v1/responses");
+  });
+
+  it("routes future passthrough spark ids to /responses", () => {
+    const ex = new MuseExecutor();
+    expect(ex.buildUrl("muse-spark-1.4-contributor-free(xhigh)")).toBe("https://api.meta.ai/v1/responses");
+    expect(getModelTargetFormat("muse", "muse-spark-1.4")).toBe(FORMATS.OPENAI_RESPONSES);
+    expect(getModelSupportedFormats("muse", "muse-spark-1.4")).toEqual([FORMATS.OPENAI_RESPONSES]);
+  });
+
+  it("leaves non-spark models on the default/runtime transport", () => {
+    const ex = new MuseExecutor();
+    expect(ex.buildUrl("some-chat-model", true, 0, {
+      runtimeTransport: { baseUrl: "https://api.meta.ai/v1/chat/completions" },
+    })).toBe("https://api.meta.ai/v1/chat/completions");
   });
 });
 

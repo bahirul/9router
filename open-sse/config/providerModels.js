@@ -55,7 +55,7 @@ export function findModelName(aliasOrId, modelId) {
 }
 
 export function getModelTargetFormat(aliasOrId, modelId) {
-  if (isOpenCodeAlias(aliasOrId) && isMuseSparkModel(modelId)) {
+  if ((isOpenCodeAlias(aliasOrId) || aliasOrId === "muse") && isMuseSparkModel(modelId)) {
     return FORMATS.OPENAI_RESPONSES;
   }
   const models = PROVIDER_MODELS[aliasOrId];
@@ -76,6 +76,7 @@ export function getModelSupportedFormats(aliasOrId, modelId) {
   if (!models) return null;
   const found = findModel(models, modelId, aliasOrId);
   if (found) return modelSupportedFormats(found);
+  if (aliasOrId === "muse" && isMuseSparkModel(modelId)) return [FORMATS.OPENAI_RESPONSES];
   if (isOpenCodeAlias(aliasOrId)) return opencodeFamilyFormats(modelId)?.supportedFormats || [FORMATS.OPENAI];
   return null;
 }
