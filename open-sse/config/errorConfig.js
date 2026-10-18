@@ -59,10 +59,6 @@ const COOLDOWN = {
 export const ERROR_RULES = [
   // --- Text-based rules (checked first, order = priority) ---
   { provider: "codex", text: "model is not supported when using codex with a chatgpt account", cooldownMs: MAX_RATE_LIMIT_COOLDOWN_MS },
-  // Meta intermittently 404s valid Muse Spark models (same id/body succeeds on
-  // retry), so a model_not_found must not cost the 2-minute blanket-404 lock —
-  // one flake would black out the model on every account that hit it.
-  { provider: "muse", text: "model_not_found", cooldownMs: COOLDOWN.short },
   { text: "no credentials",           cooldownMs: COOLDOWN.long },
   { text: "request not allowed",      cooldownMs: COOLDOWN.short },
   { text: "improperly formed request", cooldownMs: COOLDOWN.long },

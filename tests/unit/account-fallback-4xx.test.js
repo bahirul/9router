@@ -35,22 +35,4 @@ describe("checkFallbackError — request-scoped vs account-scoped failures", () 
     expect(result.shouldFallback).toBe(true);
     expect(result.cooldownMs).toBeGreaterThan(0);
   });
-
-  it("gives a transient muse model_not_found a short lock, not the 2-minute 404 lock", () => {
-    const body = JSON.stringify({
-      error: {
-        code: "model_not_found",
-        message: "The requested model was not found.",
-        type: "invalid_request_error",
-      },
-    });
-
-    // Still fails over to the next account within the request, but the model
-    // lock expires in seconds so one upstream flake cannot black out the model.
-    expect(checkFallbackError(404, body, 0, "muse")).toEqual({ shouldFallback: true, cooldownMs: 5000 });
-    // Scoped to muse: other providers keep the blanket-404 cooldown.
-    expect(checkFallbackError(404, body, 0, "openai").cooldownMs).toBe(120000);
-    // And a muse 404 without that wording keeps the blanket rule.
-    expect(checkFallbackError(404, "nope", 0, "muse").cooldownMs).toBe(120000);
-  });
 });
